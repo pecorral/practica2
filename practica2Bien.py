@@ -6,6 +6,11 @@ Created on Thu Mar  9 09:19:11 2023
 @author: Pedro Corral
 """
 
+
+"""
+HAY QUE GUARDAR EL Nº DE COCHES Y PEATONES QUE ESTÉN ESPERANDO Y SI HAY MÁS DE UNA CANTIDAD ESPERANDO NO PERMITIR QUE SIGAN ENTRANDO 
+'GENTE' DEL MISMO TIPO QUE LOS QUE ESTABAN DENTRO
+"""
 import time
 import random
 from multiprocessing import Lock, Condition, Process
