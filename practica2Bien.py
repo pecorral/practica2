@@ -101,25 +101,25 @@ def delay_pedestrian(factor = 3) -> None:
     time.sleep(random.random()/factor)
 
 def car(cid: int, direction: int, monitor: Monitor)  -> None:
-    print(f"car {cid} heading {direction} wants to enter. {monitor}")
+    print(f"car {cid} heading {direction} wants to enter. {monitor}",flush=True)
     monitor.wants_enter_car(direction)
-    print(f"car {cid} heading {direction} enters the bridge. {monitor}")
+    print(f"car {cid} heading {direction} enters the bridge. {monitor}",flush=True)
     if direction==NORTH :
         delay_car_north()
     else:
         delay_car_south()
-    print(f"car {cid} heading {direction} leaving the bridge. {monitor}")
+    print(f"car {cid} heading {direction} leaving the bridge. {monitor}",flush=True)
     monitor.leaves_car(direction)
-    print(f"car {cid} heading {direction} out of the bridge. {monitor}")
+    print(f"car {cid} heading {direction} out of the bridge. {monitor}",flush=True)
 
 def pedestrian(pid: int, monitor: Monitor) -> None:
-    print(f"pedestrian {pid} wants to enter. {monitor}")
+    print(f"pedestrian {pid} wants to enter. {monitor}",flush=True)
     monitor.wants_enter_pedestrian()
-    print(f"pedestrian {pid} enters the bridge. {monitor}")
+    print(f"pedestrian {pid} enters the bridge. {monitor}",flush=True)
     delay_pedestrian()
-    print(f"pedestrian {pid} leaving the bridge. {monitor}")
+    print(f"pedestrian {pid} leaving the bridge. {monitor}",flush=True)
     monitor.leaves_pedestrian()
-    print(f"pedestrian {pid} out of the bridge. {monitor}")
+    print(f"pedestrian {pid} out of the bridge. {monitor}",flush=True)
 
 
 
@@ -158,7 +158,7 @@ def main():
     gped.start()
     gcars.join()
     gped.join()
-
+    print("FIN DE LA EJECUCIÓN",flush=True)
 
 if __name__ == '__main__':
     main()
