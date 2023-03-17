@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Mar 10 11:42:26 2023
+Created on Thu Mar  9 09:19:11 2023
 
 @author: Pedro Corral
 """
@@ -14,62 +14,34 @@ from multiprocessing import Value
 SOUTH = 1
 NORTH = 0
 
-NCARS = 30
-NPED = 6
+NCARS = 100
+NPED = 10
 TIME_CARS = 0.5  # a new car enters each 0.5s
 TIME_PED = 5 # a new pedestrian enters each 5s
 TIME_IN_BRIDGE_CARS = (1, 0.5) # normal 1s, 0.5s
-TIME_IN_BRIDGE_PEDESTRIAN = (30, 10) # normal 1s, 0.5s
-WAIT_LIMIT_NUMBER_CARS=2 
-WAIT_LIMIT_NUMBER_PED=0 
-#Si hay (estrict.) más de ese número de peatones esperando, no podrán entrar a esperar ningún otro coche más. 
-# Y por tanto, en el peor de los casos hará falta esperar a que salgan todos los coches que ya estaban dentro o que ya estuvieran esperando antes,
-# pero una vez salgan, tendrán que entrar sí o sí los peatones, garantizando que no se queden esperando indefinidamente, eliminando la inanición. 
-# Lo mismo ocurre con los coches y, además, estos valores elegidos deberían variar según la frecuencia con la que aparezcan coches y peatones.
+TIME_IN_BRIDGE_PEDESTRGIAN = (30, 10) # normal 1s, 0.5s
+
 class Monitor():
     def __init__(self):
         self.mutex = Lock()
         self.patata = Value('i', 0)
-        
         self.ncarsN = Value('i', 0)
         self.ncarsS = Value('i', 0)
         self.nPed   = Value('i', 0)
-        
-        self.canPassCN = Condition(self.mutex)
-        self.canPassCS = Condition(self.mutex)
-        self.canPassP  = Condition(self.mutex)
-        
-        self.ncNwaiting = Value('i', 0)
-        self.ncSwaiting = Value('i', 0)
-        self.nPwaiting  = Value('i', 0)
-        
-        self.waitCN    = Condition(self.mutex)
-        self.waitCS    = Condition(self.mutex)
-        self.waitP     = Condition(self.mutex)
+        self.noProbCarsN=Condition(self.mutex)
+        self.noProbCarsS=Condition(self.mutex)
+        self.noProbPed  =Condition(self.mutex)
 
     def wants_enter_car(self, direction: int) -> None:
         self.mutex.acquire()
         self.patata.value += 1
         if direction==NORTH:
-            self.ncNwaiting.value+=1
-            self.waitCN.wait_for(self.are_waiting_cars_North)
-            self.canPassCN.wait_for(self.can_pass_cars_North)
+            self.noProbCarsN.wait_for(self.can_pass_cars_North)
             self.ncarsN.value+=1
-            self.ncNwaiting.value-=1
-            if self.ncNwaiting.value<=WAIT_LIMIT_NUMBER_CARS:
-                # Es importante el orden en el que ponemos los notify para que no puedan ponerse de acuerdo 
-                # dos grupos para dejar al tercer grupo sin poder cruzar el puente jamás. 
-                self.canPassCS.notify_all()
-                self.canPassP.notify_all()
+
         else:
-            self.ncSwaiting.value+=1
-            self.waitCS.wait_for(self.are_waiting_cars_South)
-            self.canPassCS.wait_for(self.can_pass_cars_South)
+            self.noProbCarsS.wait_for(self.can_pass_cars_South)
             self.ncarsS.value+=1
-            self.ncSwaiting.value-=1
-            if self.ncSwaiting.value<=WAIT_LIMIT_NUMBER_CARS:
-                self.canPassP.notify_all()
-                self.canPassCN.notify_all()
         self.mutex.release()
 
     def leaves_car(self, direction: int) -> None:
@@ -78,26 +50,20 @@ class Monitor():
         if direction==NORTH:
             self.ncarsN.value-=1
             if self.ncarsN.value==0:
-                self.canPassCS.notify_all()
-                self.canPassP.notify_all()
+                self.noProbCarsS.notify_all()
+                self.noProbPed.notify_all()
         else:
             self.ncarsS.value-=1
             if self.ncarsS.value==0:
-                self.canPassCN.notify_all()
-                self.canPassP.notify_all()
+                self.noProbPed.notify_all()
+                self.noProbCarsN.notify_all()
         self.mutex.release()
 
     def wants_enter_pedestrian(self) -> None:
         self.mutex.acquire()
         self.patata.value += 1
-        self.nPwaiting.value+=1
-        self.waitP.wait_for(self.are_waiting_Pedestrians)
-        self.canPassP.wait_for(self.can_pass_Ped)
+        self.noProbPed.wait_for(self.can_pass_Ped)
         self.nPed.value+=1
-        self.nPwaiting.value-=1
-        if self.nPwaiting.value<=WAIT_LIMIT_NUMBER_PED:
-            self.waitCN.notify_all()
-            self.waitCS.notify_all()
         self.mutex.release()
 
     def leaves_pedestrian(self) -> None:
@@ -105,8 +71,8 @@ class Monitor():
         self.patata.value += 1
         self.nPed.value-=1
         if self.nPed.value==0:
-            self.canPassCN.notify_all()
-            self.canPassCS.notify_all()
+            self.noProbCarsN.notify_all()
+            self.noProbCarsS.notify_all()
         self.mutex.release()
         
     def can_pass_cars_South(self) -> bool:
@@ -117,16 +83,7 @@ class Monitor():
     
     def can_pass_Ped(self) -> bool:
         return self.ncarsN.value == 0 and self.ncarsS.value == 0
-    
-    def are_waiting_cars_North(self) -> bool:
-        return self.ncSwaiting.value<=WAIT_LIMIT_NUMBER_CARS and self.nPwaiting.value<=WAIT_LIMIT_NUMBER_PED
-    
-    def are_waiting_cars_South(self) -> bool:
-        return self.ncNwaiting.value<=WAIT_LIMIT_NUMBER_CARS and self.nPwaiting.value<=WAIT_LIMIT_NUMBER_PED
 
-    def are_waiting_Pedestrians(self) -> bool:
-        return self.ncNwaiting.value<=WAIT_LIMIT_NUMBER_CARS and self.ncSwaiting.value<=WAIT_LIMIT_NUMBER_CARS
-    
     def __repr__(self) -> str:
         return f'Monitor: {self.patata.value}'
 
@@ -140,8 +97,7 @@ def delay_car_south(factor = 4) -> None:
 
 def delay_pedestrian(factor = 2) -> None:
     time.sleep(random.random()/factor)
-    
-    
+
 def car(cid: int, direction: int, monitor: Monitor)  -> None:
     print(f"car {cid} heading {direction} wants to enter. {monitor}",flush=True)
     monitor.wants_enter_car(direction)
@@ -204,3 +160,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
